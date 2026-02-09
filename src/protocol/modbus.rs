@@ -76,9 +76,10 @@ impl ModbusHandler {
     pub async fn read_holding_registers(&mut self, address: u16, count: u16) -> Result<Vec<u16>> {
         #[cfg(feature = "modbus")]
         {
+            use tokio_modbus::client::Reader;
             let mut ctx_guard = self.context.lock().await;
             if let Some(ctx) = ctx_guard.as_mut() {
-                let result = ctx
+                let result: Vec<u16> = ctx
                     .read_holding_registers(address, count)
                     .await
                     .map_err(|e| Error::Protocol(format!("Modbus read failed: {}", e)))?;
@@ -100,15 +101,16 @@ impl ModbusHandler {
     pub async fn write_single_register(&mut self, address: u16, value: u16) -> Result<()> {
         #[cfg(feature = "modbus")]
         {
+            use tokio_modbus::client::Writer;
             let mut ctx_guard = self.context.lock().await;
             if let Some(ctx) = ctx_guard.as_mut() {
-                ctx
-                    .write_single_register(address, value)
-                    .await
-                    .map_err(|e| Error::Protocol(format!("Modbus write failed: {}", e)))?;
-                
-                log::debug!("Wrote value {} to register {}", value, address);
-                Ok(())
+                match ctx.write_single_register(address, value).await {
+                    Ok(_) => {
+                        log::debug!("Wrote value {} to register {}", value, address);
+                        Ok(())
+                    }
+                    Err(e) => Err(Error::Protocol(format!("Modbus write failed: {}", e))),
+                }
             } else {
                 Err(Error::Connection("Not connected to Modbus server".to_string()))
             }
@@ -124,9 +126,10 @@ impl ModbusHandler {
     pub async fn read_input_registers(&mut self, address: u16, count: u16) -> Result<Vec<u16>> {
         #[cfg(feature = "modbus")]
         {
+            use tokio_modbus::client::Reader;
             let mut ctx_guard = self.context.lock().await;
             if let Some(ctx) = ctx_guard.as_mut() {
-                let result = ctx
+                let result: Vec<u16> = ctx
                     .read_input_registers(address, count)
                     .await
                     .map_err(|e| Error::Protocol(format!("Modbus read failed: {}", e)))?;
@@ -148,9 +151,10 @@ impl ModbusHandler {
     pub async fn read_coils(&mut self, address: u16, count: u16) -> Result<Vec<bool>> {
         #[cfg(feature = "modbus")]
         {
+            use tokio_modbus::client::Reader;
             let mut ctx_guard = self.context.lock().await;
             if let Some(ctx) = ctx_guard.as_mut() {
-                let result = ctx
+                let result: Vec<bool> = ctx
                     .read_coils(address, count)
                     .await
                     .map_err(|e| Error::Protocol(format!("Modbus read failed: {}", e)))?;
@@ -172,15 +176,16 @@ impl ModbusHandler {
     pub async fn write_single_coil(&mut self, address: u16, value: bool) -> Result<()> {
         #[cfg(feature = "modbus")]
         {
+            use tokio_modbus::client::Writer;
             let mut ctx_guard = self.context.lock().await;
             if let Some(ctx) = ctx_guard.as_mut() {
-                ctx
-                    .write_single_coil(address, value)
-                    .await
-                    .map_err(|e| Error::Protocol(format!("Modbus write failed: {}", e)))?;
-                
-                log::debug!("Wrote value {} to coil {}", value, address);
-                Ok(())
+                match ctx.write_single_coil(address, value).await {
+                    Ok(_) => {
+                        log::debug!("Wrote value {} to coil {}", value, address);
+                        Ok(())
+                    }
+                    Err(e) => Err(Error::Protocol(format!("Modbus write failed: {}", e))),
+                }
             } else {
                 Err(Error::Connection("Not connected to Modbus server".to_string()))
             }
