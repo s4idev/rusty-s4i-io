@@ -1,4 +1,4 @@
-//! BACNet/IP protocol implementation
+//! BACnet/IP protocol implementation
 
 use crate::error::{Error, Result};
 use crate::protocol::{ProtocolHandler, ProtocolMessage};
@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 #[cfg(feature = "bacnet")]
 use tokio::net::UdpSocket;
 
-/// BACNet object types
+/// BACnet object types
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BacnetObjectType {
     AnalogInput = 0,
@@ -24,7 +24,7 @@ pub enum BacnetObjectType {
     Device = 8,
 }
 
-/// BACNet property identifiers
+/// BACnet property identifiers
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BacnetProperty {
     PresentValue = 85,
@@ -33,7 +33,7 @@ pub enum BacnetProperty {
     Units = 117,
 }
 
-/// BACNet client configuration
+/// BACnet client configuration
 #[derive(Debug, Clone)]
 pub struct BacnetConfig {
     pub address: String,
@@ -46,14 +46,14 @@ impl Default for BacnetConfig {
     fn default() -> Self {
         Self {
             address: "127.0.0.1".to_string(),
-            port: 47808, // Standard BACNet/IP port
+            port: 47808, // Standard BACnet/IP port
             device_id: 1234,
             network_number: 0,
         }
     }
 }
 
-/// BACNet protocol handler
+/// BACnet protocol handler
 pub struct BacnetHandler {
     config: BacnetConfig,
     #[cfg(feature = "bacnet")]
@@ -65,7 +65,7 @@ pub struct BacnetHandler {
 }
 
 impl BacnetHandler {
-    /// Create a new BACNet handler
+    /// Create a new BACnet handler
     pub fn new(config: BacnetConfig) -> Self {
         Self {
             config,
@@ -90,11 +90,11 @@ impl BacnetHandler {
         {
             if !*self.connected.lock().await {
                 return Err(Error::Connection(
-                    "Not connected to BACNet network".to_string(),
+                    "Not connected to BACnet network".to_string(),
                 ));
             }
 
-            // Build BACNet Read Property request
+            // Build BACnet Read Property request
             let request = self.build_read_property_request(
                 device_id,
                 object_type,
@@ -108,7 +108,7 @@ impl BacnetHandler {
                 let target = format!("{}:{}", self.config.address, self.config.port);
                 socket.send_to(&request, &target).await?;
 
-                // Wait for response (simplified - in real implementation would parse BACNet response)
+                // Wait for response (simplified - in real implementation would parse BACnet response)
                 let mut buffer = vec![0u8; 1024];
                 match tokio::time::timeout(
                     std::time::Duration::from_secs(5),
@@ -135,7 +135,7 @@ impl BacnetHandler {
         {
             let _ = (device_id, object_type, object_instance, property);
             Err(Error::NotSupported(
-                "BACNet feature not enabled".to_string(),
+                "BACnet feature not enabled".to_string(),
             ))
         }
     }
@@ -153,11 +153,11 @@ impl BacnetHandler {
         {
             if !*self.connected.lock().await {
                 return Err(Error::Connection(
-                    "Not connected to BACNet network".to_string(),
+                    "Not connected to BACnet network".to_string(),
                 ));
             }
 
-            // Build BACNet Write Property request
+            // Build BACnet Write Property request
             let request = self.build_write_property_request(
                 device_id,
                 object_type,
@@ -188,7 +188,7 @@ impl BacnetHandler {
         {
             let _ = (device_id, object_type, object_instance, property, value);
             Err(Error::NotSupported(
-                "BACNet feature not enabled".to_string(),
+                "BACnet feature not enabled".to_string(),
             ))
         }
     }
@@ -199,11 +199,11 @@ impl BacnetHandler {
         {
             if !*self.connected.lock().await {
                 return Err(Error::Connection(
-                    "Not connected to BACNet network".to_string(),
+                    "Not connected to BACnet network".to_string(),
                 ));
             }
 
-            // Build BACNet Who-Is broadcast request
+            // Build BACnet Who-Is broadcast request
             let request = self.build_who_is_request()?;
 
             // Send broadcast
@@ -242,7 +242,7 @@ impl BacnetHandler {
         #[cfg(not(feature = "bacnet"))]
         {
             Err(Error::NotSupported(
-                "BACNet feature not enabled".to_string(),
+                "BACnet feature not enabled".to_string(),
             ))
         }
     }
@@ -255,11 +255,11 @@ impl BacnetHandler {
         object_instance: u32,
         property: BacnetProperty,
     ) -> Result<Vec<u8>> {
-        // Simplified BACNet/IP BVLC + NPDU + APDU construction
+        // Simplified BACnet/IP BVLC + NPDU + APDU construction
         let mut buffer = BytesMut::new();
         
-        // BVLC Header (BACNet Virtual Link Control)
-        buffer.put_u8(0x81); // Type: BACNet/IP
+        // BVLC Header (BACnet Virtual Link Control)
+        buffer.put_u8(0x81); // Type: BACnet/IP
         buffer.put_u8(0x0A); // Function: Original-Unicast-NPDU
         buffer.put_u16(0); // Length placeholder
         
@@ -291,7 +291,7 @@ impl BacnetHandler {
         property: BacnetProperty,
         value: Bytes,
     ) -> Result<Vec<u8>> {
-        // Simplified BACNet/IP Write Property request
+        // Simplified BACnet/IP Write Property request
         let mut buffer = BytesMut::new();
         
         // BVLC Header
@@ -320,7 +320,7 @@ impl BacnetHandler {
 
     #[cfg(feature = "bacnet")]
     fn build_who_is_request(&self) -> Result<Vec<u8>> {
-        // Simplified BACNet/IP Who-Is broadcast
+        // Simplified BACnet/IP Who-Is broadcast
         let mut buffer = BytesMut::new();
         
         // BVLC Header for broadcast
@@ -351,7 +351,7 @@ impl ProtocolHandler for BacnetHandler {
     async fn connect(&mut self) -> Result<()> {
         #[cfg(feature = "bacnet")]
         {
-            // Bind to BACNet/IP port
+            // Bind to BACnet/IP port
             let bind_addr = format!("0.0.0.0:{}", self.config.port);
             let socket = UdpSocket::bind(&bind_addr).await?;
             socket.set_broadcast(true)?;
@@ -366,7 +366,7 @@ impl ProtocolHandler for BacnetHandler {
             *self.connected.lock().await = true;
             
             log::info!(
-                "BACNet connected on port {}",
+                "BACnet connected on port {}",
                 self.config.port
             );
             Ok(())
@@ -374,7 +374,7 @@ impl ProtocolHandler for BacnetHandler {
         #[cfg(not(feature = "bacnet"))]
         {
             Err(Error::NotSupported(
-                "BACNet feature not enabled".to_string(),
+                "BACnet feature not enabled".to_string(),
             ))
         }
     }
@@ -387,25 +387,25 @@ impl ProtocolHandler for BacnetHandler {
         }
         
         *self.connected.lock().await = false;
-        log::info!("BACNet disconnected");
+        log::info!("BACnet disconnected");
         Ok(())
     }
 
     async fn publish(&mut self, message: ProtocolMessage) -> Result<()> {
-        // BACNet doesn't have a traditional publish concept
+        // BACnet doesn't have a traditional publish concept
         // This could be used for COV (Change of Value) notifications
         let _ = message;
         Err(Error::NotSupported(
-            "Publish not fully supported for BACNet. Use write_property() instead.".to_string(),
+            "Publish not fully supported for BACnet. Use write_property() instead.".to_string(),
         ))
     }
 
     async fn subscribe(&mut self, topic: &str) -> Result<()> {
-        // BACNet doesn't have a traditional subscribe concept
+        // BACnet doesn't have a traditional subscribe concept
         // Could be used for COV (Change of Value) subscriptions in future
         let _ = topic;
         Err(Error::NotSupported(
-            "Subscribe not fully supported for BACNet (COV subscriptions not yet implemented)".to_string(),
+            "Subscribe not fully supported for BACnet (COV subscriptions not yet implemented)".to_string(),
         ))
     }
 
@@ -419,7 +419,7 @@ impl ProtocolHandler for BacnetHandler {
 
         #[cfg(feature = "bacnet")]
         {
-            // Poll for incoming BACNet messages
+            // Poll for incoming BACnet messages
             let socket_guard = self.socket.lock().await;
             if let Some(socket) = socket_guard.as_ref() {
                 let mut buffer = vec![0u8; 1024];
@@ -428,7 +428,7 @@ impl ProtocolHandler for BacnetHandler {
                     socket.recv_from(&mut buffer)
                 ).await {
                     Ok(Ok((size, addr))) => {
-                        // Parse BACNet message (simplified)
+                        // Parse BACnet message (simplified)
                         let msg = ProtocolMessage {
                             topic: format!("bacnet/{}", addr),
                             payload: Bytes::copy_from_slice(&buffer[..size]),

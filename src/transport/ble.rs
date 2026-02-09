@@ -96,10 +96,11 @@ impl TransportService for BleTransport {
             let peripheral = peripherals
                 .into_iter()
                 .find(|p| {
-                    if let Ok(Some(props)) = p.properties().as_ref().ok().and_then(|p| p.as_ref()) {
-                        props.local_name.as_ref().map_or(false, |name| name.contains(&self.config.address))
-                    } else {
-                        false
+                    match p.properties() {
+                        Ok(Some(props)) => {
+                            props.local_name.as_ref().map_or(false, |name| name.contains(&self.config.address))
+                        }
+                        _ => false
                     }
                 })
                 .ok_or_else(|| Error::Connection(format!("BLE device not found: {}", self.config.address)))?;
