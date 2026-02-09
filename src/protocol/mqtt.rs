@@ -69,7 +69,7 @@ impl ProtocolHandler for MqttHandler {
             // Parse broker URL
             let url = self.config.broker_url.trim_start_matches("mqtt://");
             let parts: Vec<&str> = url.split(':').collect();
-            let host = parts.get(0).unwrap_or(&"localhost");
+            let host = parts.get(0).unwrap_or(&"localhost").to_string();
             let port: u16 = parts.get(1).and_then(|p| p.parse().ok()).unwrap_or(1883);
 
             // Create MQTT options

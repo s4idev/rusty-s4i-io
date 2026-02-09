@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 #[cfg(feature = "modbus")]
-use tokio_modbus::client::{Context, tcp, rtu};
+use tokio_modbus::client::tcp::Context;
 #[cfg(feature = "modbus")]
 use tokio_modbus::prelude::*;
 
@@ -198,46 +198,27 @@ impl ProtocolHandler for ModbusHandler {
     async fn connect(&mut self) -> Result<()> {
         #[cfg(feature = "modbus")]
         {
-            let context = match self.config.protocol {
+            match self.config.protocol {
                 ModbusProtocol::Tcp => {
                     let socket_addr = self.config.address.parse()
                         .map_err(|e| Error::Configuration(format!("Invalid address: {}", e)))?;
                     
-                    let ctx = tcp::connect_slave(socket_addr, Slave(self.config.slave_id))
+                    let ctx = tokio_modbus::client::tcp::connect_slave(socket_addr, Slave(self.config.slave_id))
                         .await
                         .map_err(|e| Error::Connection(format!("Modbus TCP connection failed: {}", e)))?;
                     
-                    ctx
+                    *self.context.lock().await = Some(ctx);
+                    *self.connected.lock().await = true;
+                    
+                    log::info!("Modbus TCP connected to {}", self.config.address);
+                    Ok(())
                 }
                 ModbusProtocol::Rtu => {
-                    #[cfg(feature = "serial")]
-                    {
-                        use tokio_serial::SerialPortBuilderExt;
-                        
-                        let builder = tokio_serial::new(&self.config.address, 9600);
-                        let port = builder.open_native_async()
-                            .map_err(|e| Error::Connection(format!("Failed to open serial port: {}", e)))?;
-                        
-                        let ctx = rtu::connect_slave(port, Slave(self.config.slave_id))
-                            .await
-                            .map_err(|e| Error::Connection(format!("Modbus RTU connection failed: {}", e)))?;
-                        
-                        ctx
-                    }
-                    #[cfg(not(feature = "serial"))]
-                    {
-                        return Err(Error::NotSupported(
-                            "Modbus RTU requires serial feature".to_string()
-                        ));
-                    }
+                    // Modbus RTU would require a different context type
+                    // For now, we only support TCP
+                    Err(Error::NotSupported("Modbus RTU not yet supported. Use Modbus TCP instead.".to_string()))
                 }
-            };
-
-            *self.context.lock().await = Some(context);
-            *self.connected.lock().await = true;
-            
-            log::info!("Modbus connected to {}", self.config.address);
-            Ok(())
+            }
         }
         #[cfg(not(feature = "modbus"))]
         {
