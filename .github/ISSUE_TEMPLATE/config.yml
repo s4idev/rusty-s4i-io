@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://docs.rs/rusty-s4i-io
+    about: Check the API documentation for usage information
+  - name: Platform Support Guide
+    url: https://github.com/s4idev/rusty-s4i-io/blob/main/PLATFORM.md
+    about: Platform-specific notes and requirements
+  - name: Build Guide
+    url: https://github.com/s4idev/rusty-s4i-io/blob/main/BUILD.md
+    about: Detailed build instructions for all platforms

@@ -1,0 +1,252 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+permissions:
+  contents: read
+
+jobs:
+  # Test with default features on multiple platforms
+  test-default:
+    name: Test (default features)
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        rust: [stable, beta]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+      
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Build
+        run: cargo build --verbose
+      
+      - name: Run tests
+        run: cargo test --verbose
+
+  # Test individual transport features
+  test-transports:
+    name: Test transports
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        feature:
+          - tcp
+          - udp
+          - http
+          - websocket
+          - tls
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Test ${{ matrix.feature }}
+        run: cargo test --no-default-features --features ${{ matrix.feature }}
+
+  # Test protocol features
+  test-protocols:
+    name: Test protocols
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        feature:
+          - mqtt
+          - modbus
+          - bacnet
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Test ${{ matrix.feature }}
+        run: cargo test --no-default-features --features tcp,${{ matrix.feature }}
+
+  # Test platform-specific features with dependencies
+  test-platform-features:
+    name: Test platform features
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux-specific features
+          - os: ubuntu-latest
+            feature: serial
+            deps: libudev-dev
+          - os: ubuntu-latest
+            feature: usb
+            deps: libudev-dev
+          - os: ubuntu-latest
+            feature: ble
+            deps: libdbus-1-dev
+          
+          # macOS-specific features
+          - os: macos-latest
+            feature: serial
+            deps: none
+          - os: macos-latest
+            feature: ble
+            deps: none
+          
+          # Windows-specific features
+          - os: windows-latest
+            feature: serial
+            deps: none
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux' && matrix.deps != 'none'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.deps }}
+      
+      - name: Test ${{ matrix.feature }}
+        run: cargo test --no-default-features --features tcp,${{ matrix.feature }}
+
+  # Linting and formatting
+  lint:
+    name: Lint and Format
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      
+      - name: Check formatting
+        run: cargo fmt -- --check
+      
+      - name: Run clippy (default features)
+        run: cargo clippy -- -D warnings
+      
+      - name: Run clippy (all non-hw features)
+        run: cargo clippy --features tcp,udp,http,websocket,tls,mqtt,modbus,bacnet -- -D warnings
+
+  # Check documentation
+  doc:
+    name: Documentation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Check documentation
+        run: cargo doc --no-deps --features tcp,udp,http,websocket,tls,mqtt,modbus,bacnet
+      
+      - name: Check documentation examples
+        run: cargo test --doc --features tcp,udp,mqtt,modbus,bacnet
+
+  # Security audit
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run cargo-audit
+        uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Check minimum supported Rust version (MSRV)
+  msrv:
+    name: Minimum Supported Rust Version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust 1.70.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.70.0
+      
+      - name: Check MSRV
+        run: cargo check --features tcp,udp
+
+  # Examples compilation check
+  examples:
+    name: Check Examples
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Check TCP example
+        run: cargo check --example tcp_example --features tcp
+      
+      - name: Check UDP example
+        run: cargo check --example udp_example --features udp
+      
+      - name: Check MQTT example
+        run: cargo check --example mqtt_example --features mqtt
+      
+      - name: Check Modbus example
+        run: cargo check --example modbus_example --features modbus
+      
+      - name: Check BACnet example
+        run: cargo check --example bacnet_example --features bacnet

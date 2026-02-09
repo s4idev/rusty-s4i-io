@@ -1,0 +1,125 @@
+name: Bug Report
+description: File a bug report to help us improve
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of the bug
+      placeholder: Describe what happened
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: Describe what you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this issue?
+      placeholder: |
+        1. Initialize with...
+        2. Call function...
+        3. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: code
+    attributes:
+      label: Minimal Reproducible Example
+      description: Please provide a minimal code example that reproduces the issue
+      render: rust
+      placeholder: |
+        use rusty_s4i_io::*;
+        
+        fn main() {
+            // Your code here
+        }
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      description: What platform are you running on?
+      options:
+        - Linux
+        - macOS
+        - Windows
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: os-version
+    attributes:
+      label: OS Version
+      description: "e.g., Ubuntu 22.04, macOS 14.0, Windows 11"
+      placeholder: "Ubuntu 22.04"
+    validations:
+      required: true
+
+  - type: input
+    id: rust-version
+    attributes:
+      label: Rust Version
+      description: Output of `rustc --version`
+      placeholder: "rustc 1.70.0 (90c541806 2023-05-31)"
+    validations:
+      required: true
+
+  - type: input
+    id: crate-version
+    attributes:
+      label: Crate Version
+      description: Version of rusty-s4i-io you're using
+      placeholder: "0.1.0"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: features
+    attributes:
+      label: Enabled Features
+      description: Which features do you have enabled?
+      options:
+        - label: tcp (default)
+        - label: udp (default)
+        - label: http
+        - label: websocket
+        - label: tls
+        - label: serial
+        - label: usb
+        - label: ble
+        - label: mqtt
+        - label: modbus
+        - label: bacnet
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Logs
+      description: Please paste any relevant error messages or logs
+      render: shell
+      placeholder: "Paste logs here..."
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other information that might be helpful
+      placeholder: "Add any other context about the problem here..."

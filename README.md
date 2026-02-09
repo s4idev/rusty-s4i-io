@@ -2,6 +2,7 @@
 
 A comprehensive Rust library for managing multiple transport protocols with a unified framework, supporting TCP/IP, UDP, HTTP/HTTPS, serial port, USB HID, BLE, WebSocket, and SSL/TLS. Additionally provides application layer protocol support for MQTT, Modbus, and BACNet/IP.
 
+[![CI](https://github.com/s4idev/rusty-s4i-io/workflows/CI/badge.svg)](https://github.com/s4idev/rusty-s4i-io/actions)
 [![Crates.io](https://img.shields.io/crates/v/rusty-s4i-io.svg)](https://crates.io/crates/rusty-s4i-io)
 [![Documentation](https://docs.rs/rusty-s4i-io/badge.svg)](https://docs.rs/rusty-s4i-io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -282,6 +283,8 @@ cargo run --example modbus_example --features modbus
 
 ## Platform-Specific Notes
 
+For detailed platform-specific information, see [PLATFORM.md](PLATFORM.md).
+
 ### Linux
 All features are fully supported. Serial port access may require appropriate permissions.
 
@@ -291,9 +294,19 @@ All features are fully supported. USB HID may require system permissions.
 ### Windows
 All features are supported. Serial port COM names use Windows format (e.g., `COM1`).
 
+## Documentation
+
+- **[Getting Started](GETTING_STARTED.md)** - Quick start guide and common use cases
+- **[Build Guide](BUILD.md)** - Detailed build instructions for all platforms
+- **[Platform Support](PLATFORM.md)** - Platform-specific notes and requirements
+- **[Contributing](CONTRIBUTING.md)** - Guidelines for contributors
+- **[API Documentation](https://docs.rs/rusty-s4i-io)** - Full API documentation
+
 ## Contributing
 
-Contributions are welcome! Please follow these guidelines:
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+Quick start:
 
 1. Fork the repository
 2. Create a feature branch
