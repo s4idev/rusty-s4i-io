@@ -1,0 +1,99 @@
+[package]
+name = "rusty-s4i-io"
+version = "0.1.0"
+edition = "2021"
+authors = ["s4idev"]
+description = "A comprehensive Rust library for managing multiple transport protocols with application layer support"
+license = "MIT"
+repository = "https://github.com/s4idev/rusty-s4i-io"
+keywords = ["networking", "transport", "mqtt", "modbus", "bacnet"]
+categories = ["network-programming", "asynchronous"]
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bytes = "1.5"
+
+# Networking
+reqwest = { version = "0.11", features = ["json"], optional = true }
+tokio-tungstenite = { version = "0.21", optional = true }
+native-tls = { version = "0.2", optional = true }
+tokio-native-tls = { version = "0.3", optional = true }
+
+# Serial port
+tokio-serial = { version = "5.4", optional = true }
+
+# USB HID
+hidapi = { version = "2.5", optional = true }
+
+# BLE (Bluetooth Low Energy)
+btleplug = { version = "0.11", optional = true }
+
+# Application layer protocols
+rumqttc = { version = "0.24", optional = true }
+tokio-modbus = { version = "0.14", optional = true }
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Logging
+log = "0.4"
+tracing = "0.1"
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockall = "0.12"
+pretty_assertions = "1.4"
+env_logger = "0.11"
+
+[features]
+default = ["tcp", "udp"]
+tcp = []
+udp = []
+http = ["reqwest"]
+websocket = ["tokio-tungstenite"]
+tls = ["native-tls", "tokio-native-tls"]
+serial = ["tokio-serial"]
+usb = ["hidapi"]
+ble = ["btleplug"]
+mqtt = ["rumqttc"]
+modbus = ["tokio-modbus"]
+bacnet = []
+all-transports = ["tcp", "udp", "http", "websocket", "tls", "serial", "usb", "ble"]
+all-protocols = ["mqtt", "modbus", "bacnet"]
+full = ["all-transports", "all-protocols"]
+
+[lib]
+name = "rusty_s4i_io"
+path = "src/lib.rs"
+
+[[example]]
+name = "tcp_example"
+path = "examples/tcp_example.rs"
+required-features = ["tcp"]
+
+[[example]]
+name = "udp_example"
+path = "examples/udp_example.rs"
+required-features = ["udp"]
+
+[[example]]
+name = "mqtt_example"
+path = "examples/mqtt_example.rs"
+required-features = ["mqtt"]
+
+[[example]]
+name = "modbus_example"
+path = "examples/modbus_example.rs"
+required-features = ["modbus"]
+
+[[example]]
+name = "bacnet_example"
+path = "examples/bacnet_example.rs"
+required-features = ["bacnet"]
