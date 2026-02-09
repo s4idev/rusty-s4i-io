@@ -3,9 +3,13 @@
 use crate::error::{Error, Result};
 use crate::protocol::{ProtocolHandler, ProtocolMessage};
 use async_trait::async_trait;
+use bytes::Bytes;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+
+#[cfg(feature = "mqtt")]
+use rumqttc::{AsyncClient, Event, EventLoop, MqttOptions, Packet, QoS};
 
 /// MQTT client configuration
 #[derive(Debug, Clone)]
@@ -34,6 +38,10 @@ impl Default for MqttConfig {
 /// MQTT protocol handler
 pub struct MqttHandler {
     config: MqttConfig,
+    #[cfg(feature = "mqtt")]
+    client: Arc<Mutex<Option<AsyncClient>>>,
+    #[cfg(feature = "mqtt")]
+    eventloop: Arc<Mutex<Option<EventLoop>>>,
     connected: Arc<Mutex<bool>>,
     messages: Arc<Mutex<VecDeque<ProtocolMessage>>>,
 }
@@ -43,6 +51,10 @@ impl MqttHandler {
     pub fn new(config: MqttConfig) -> Self {
         Self {
             config,
+            #[cfg(feature = "mqtt")]
+            client: Arc::new(Mutex::new(None)),
+            #[cfg(feature = "mqtt")]
+            eventloop: Arc::new(Mutex::new(None)),
             connected: Arc::new(Mutex::new(false)),
             messages: Arc::new(Mutex::new(VecDeque::new())),
         }
@@ -54,9 +66,47 @@ impl ProtocolHandler for MqttHandler {
     async fn connect(&mut self) -> Result<()> {
         #[cfg(feature = "mqtt")]
         {
-            // MQTT connection implementation using rumqttc would go here
+            // Parse broker URL
+            let url = self.config.broker_url.trim_start_matches("mqtt://");
+            let parts: Vec<&str> = url.split(':').collect();
+            let host = parts.get(0).unwrap_or(&"localhost").to_string();
+            let port: u16 = parts.get(1).and_then(|p| p.parse().ok()).unwrap_or(1883);
+
+            // Create MQTT options
+            let mut mqttoptions = MqttOptions::new(&self.config.client_id, host, port);
+            mqttoptions.set_keep_alive(std::time::Duration::from_secs(self.config.keep_alive));
+            mqttoptions.set_clean_session(self.config.clean_session);
+
+            if let (Some(username), Some(password)) = (&self.config.username, &self.config.password) {
+                mqttoptions.set_credentials(username, password);
+            }
+
+            // Create async client and event loop
+            let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
+
+            // Poll once to establish connection
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                eventloop.poll()
+            ).await {
+                Ok(Ok(Event::Incoming(Packet::ConnAck(_)))) => {
+                    log::info!("MQTT connected to {}", self.config.broker_url);
+                }
+                Ok(Ok(_)) => {
+                    // Connection in progress
+                }
+                Ok(Err(e)) => {
+                    return Err(Error::Connection(format!("MQTT connection failed: {}", e)));
+                }
+                Err(_) => {
+                    return Err(Error::Timeout);
+                }
+            }
+
+            *self.client.lock().await = Some(client);
+            *self.eventloop.lock().await = Some(eventloop);
             *self.connected.lock().await = true;
-            log::info!("MQTT connected to {}", self.config.broker_url);
+            
             Ok(())
         }
         #[cfg(not(feature = "mqtt"))]
@@ -68,27 +118,40 @@ impl ProtocolHandler for MqttHandler {
     async fn disconnect(&mut self) -> Result<()> {
         #[cfg(feature = "mqtt")]
         {
-            *self.connected.lock().await = false;
-            log::info!("MQTT disconnected");
-            Ok(())
+            let mut client_guard = self.client.lock().await;
+            if let Some(client) = client_guard.take() {
+                let _ = client.disconnect().await;
+            }
+            *self.eventloop.lock().await = None;
         }
-        #[cfg(not(feature = "mqtt"))]
-        {
-            Err(Error::NotSupported("MQTT feature not enabled".to_string()))
-        }
+        
+        *self.connected.lock().await = false;
+        log::info!("MQTT disconnected");
+        Ok(())
     }
 
     async fn publish(&mut self, message: ProtocolMessage) -> Result<()> {
         #[cfg(feature = "mqtt")]
         {
-            if !*self.connected.lock().await {
-                return Err(Error::Connection(
-                    "Not connected to MQTT broker".to_string(),
-                ));
+            let client_guard = self.client.lock().await;
+            if let Some(client) = client_guard.as_ref() {
+                let qos = match message.qos {
+                    0 => QoS::AtMostOnce,
+                    1 => QoS::AtLeastOnce,
+                    2 => QoS::ExactlyOnce,
+                    _ => QoS::AtMostOnce,
+                };
+
+                client
+                    .publish(&message.topic, qos, false, message.payload.to_vec())
+                    .await
+                    .map_err(|e| Error::Protocol(format!("MQTT publish failed: {}", e)))?;
+
+                log::debug!("Published to topic: {}", message.topic);
+                Ok(())
+            } else {
+                Err(Error::Connection("Not connected to MQTT broker".to_string()))
             }
-            // Publish implementation would go here
-            log::debug!("Publishing to topic: {}", message.topic);
-            Ok(())
         }
         #[cfg(not(feature = "mqtt"))]
         {
@@ -100,14 +163,18 @@ impl ProtocolHandler for MqttHandler {
     async fn subscribe(&mut self, topic: &str) -> Result<()> {
         #[cfg(feature = "mqtt")]
         {
-            if !*self.connected.lock().await {
-                return Err(Error::Connection(
-                    "Not connected to MQTT broker".to_string(),
-                ));
+            let client_guard = self.client.lock().await;
+            if let Some(client) = client_guard.as_ref() {
+                client
+                    .subscribe(topic, QoS::AtMostOnce)
+                    .await
+                    .map_err(|e| Error::Protocol(format!("MQTT subscribe failed: {}", e)))?;
+
+                log::debug!("Subscribed to topic: {}", topic);
+                Ok(())
+            } else {
+                Err(Error::Connection("Not connected to MQTT broker".to_string()))
             }
-            // Subscribe implementation would go here
-            log::debug!("Subscribing to topic: {}", topic);
-            Ok(())
         }
         #[cfg(not(feature = "mqtt"))]
         {
@@ -117,8 +184,42 @@ impl ProtocolHandler for MqttHandler {
     }
 
     async fn poll_message(&mut self) -> Result<Option<ProtocolMessage>> {
+        // First check queued messages
         let mut messages = self.messages.lock().await;
-        Ok(messages.pop_front())
+        if let Some(msg) = messages.pop_front() {
+            return Ok(Some(msg));
+        }
+        drop(messages);
+
+        #[cfg(feature = "mqtt")]
+        {
+            // Poll event loop for new messages
+            let mut eventloop_guard = self.eventloop.lock().await;
+            if let Some(eventloop) = eventloop_guard.as_mut() {
+                match tokio::time::timeout(
+                    std::time::Duration::from_millis(10),
+                    eventloop.poll()
+                ).await {
+                    Ok(Ok(Event::Incoming(Packet::Publish(publish)))) => {
+                        let msg = ProtocolMessage {
+                            topic: publish.topic.clone(),
+                            payload: Bytes::from(publish.payload.to_vec()),
+                            qos: publish.qos as u8,
+                        };
+                        Ok(Some(msg))
+                    }
+                    Ok(Ok(_)) => Ok(None),
+                    Ok(Err(_)) => Ok(None),
+                    Err(_) => Ok(None), // Timeout
+                }
+            } else {
+                Ok(None)
+            }
+        }
+        #[cfg(not(feature = "mqtt"))]
+        {
+            Ok(None)
+        }
     }
 
     fn is_connected(&self) -> bool {

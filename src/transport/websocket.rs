@@ -10,10 +10,16 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+#[cfg(feature = "websocket")]
+use futures_util::{SinkExt, StreamExt};
+#[cfg(feature = "websocket")]
+use tokio_tungstenite::{connect_async, tungstenite::protocol::Message, MaybeTlsStream, WebSocketStream};
+
 /// WebSocket transport implementation
 pub struct WebSocketTransport {
-    #[allow(dead_code)]
     config: TransportConfig,
+    #[cfg(feature = "websocket")]
+    ws_stream: Arc<Mutex<Option<WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>>>>,
     events: Arc<Mutex<VecDeque<TransportEvent>>>,
     connected: Arc<Mutex<bool>>,
 }
@@ -29,6 +35,8 @@ impl WebSocketTransport {
 
         Ok(Self {
             config,
+            #[cfg(feature = "websocket")]
+            ws_stream: Arc::new(Mutex::new(None)),
             events: Arc::new(Mutex::new(VecDeque::new())),
             connected: Arc::new(Mutex::new(false)),
         })
@@ -40,12 +48,27 @@ impl TransportService for WebSocketTransport {
     async fn connect(&mut self) -> Result<()> {
         #[cfg(feature = "websocket")]
         {
-            // WebSocket connection implementation would go here
+            // Build WebSocket URL
+            let url = if self.config.address.starts_with("ws://") || self.config.address.starts_with("wss://") {
+                self.config.address.clone()
+            } else {
+                format!("ws://{}", self.config.address)
+            };
+
+            // Connect to WebSocket server
+            let (ws_stream, _) = connect_async(&url)
+                .await
+                .map_err(|e| Error::Connection(format!("WebSocket connection failed: {}", e)))?;
+
+            *self.ws_stream.lock().await = Some(ws_stream);
             *self.connected.lock().await = true;
+            
             self.events
                 .lock()
                 .await
                 .push_back(TransportEvent::Connected(TransportId::Connection(0)));
+
+            log::info!("WebSocket connected to {}", url);
             Ok(())
         }
         #[cfg(not(feature = "websocket"))]
@@ -57,19 +80,32 @@ impl TransportService for WebSocketTransport {
     }
 
     async fn disconnect(&mut self) -> Result<()> {
+        #[cfg(feature = "websocket")]
+        {
+            let mut ws_guard = self.ws_stream.lock().await;
+            if let Some(mut ws) = ws_guard.take() {
+                let _ = ws.close(None).await;
+            }
+        }
+        
         *self.connected.lock().await = false;
         self.events
             .lock()
             .await
             .push_back(TransportEvent::Disconnected(TransportId::Connection(0)));
+        
+        log::info!("WebSocket disconnected");
         Ok(())
     }
 
-    async fn send(&mut self, _id: &TransportId, _data: Bytes) -> Result<()> {
+    async fn send(&mut self, _id: &TransportId, data: Bytes) -> Result<()> {
         #[cfg(feature = "websocket")]
         {
-            if *self.connected.lock().await {
-                // WebSocket send implementation would go here
+            let mut ws_guard = self.ws_stream.lock().await;
+            if let Some(ws) = ws_guard.as_mut() {
+                ws.send(Message::Binary(data.to_vec()))
+                    .await
+                    .map_err(|e| Error::Connection(format!("WebSocket send failed: {}", e)))?;
                 Ok(())
             } else {
                 Err(Error::Connection("Not connected".to_string()))
@@ -77,6 +113,7 @@ impl TransportService for WebSocketTransport {
         }
         #[cfg(not(feature = "websocket"))]
         {
+            let _ = data;
             Err(Error::NotSupported(
                 "WebSocket feature not enabled".to_string(),
             ))
@@ -84,8 +121,73 @@ impl TransportService for WebSocketTransport {
     }
 
     async fn poll_event(&mut self) -> Result<Option<TransportEvent>> {
+        // First, check if there are any queued events
         let mut events = self.events.lock().await;
-        Ok(events.pop_front())
+        if let Some(event) = events.pop_front() {
+            return Ok(Some(event));
+        }
+        drop(events);
+
+        #[cfg(feature = "websocket")]
+        {
+            // Try to read data from WebSocket
+            let mut ws_guard = self.ws_stream.lock().await;
+            if let Some(ws) = ws_guard.as_mut() {
+                // Non-blocking read with timeout
+                match tokio::time::timeout(
+                    std::time::Duration::from_millis(10),
+                    ws.next(),
+                )
+                .await
+                {
+                    Ok(Some(Ok(msg))) => {
+                        match msg {
+                            Message::Binary(data) => {
+                                Ok(Some(TransportEvent::DataReceived(
+                                    TransportId::Connection(0),
+                                    Bytes::from(data),
+                                )))
+                            }
+                            Message::Text(text) => {
+                                Ok(Some(TransportEvent::DataReceived(
+                                    TransportId::Connection(0),
+                                    Bytes::from(text.into_bytes()),
+                                )))
+                            }
+                            Message::Close(_) => {
+                                drop(ws_guard);
+                                let _ = self.disconnect().await;
+                                Ok(Some(TransportEvent::Disconnected(TransportId::Connection(0))))
+                            }
+                            Message::Ping(_) | Message::Pong(_) => Ok(None),
+                            _ => Ok(None),
+                        }
+                    }
+                    Ok(Some(Err(e))) => {
+                        Ok(Some(TransportEvent::Error(
+                            TransportId::Connection(0),
+                            e.to_string(),
+                        )))
+                    }
+                    Ok(None) => {
+                        // Stream ended
+                        drop(ws_guard);
+                        let _ = self.disconnect().await;
+                        Ok(Some(TransportEvent::Disconnected(TransportId::Connection(0))))
+                    }
+                    Err(_) => {
+                        // Timeout - no data available
+                        Ok(None)
+                    }
+                }
+            } else {
+                Ok(None)
+            }
+        }
+        #[cfg(not(feature = "websocket"))]
+        {
+            Ok(None)
+        }
     }
 
     fn is_connected(&self) -> bool {
