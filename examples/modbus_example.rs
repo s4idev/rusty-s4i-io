@@ -1,7 +1,10 @@
 //! Modbus protocol example
 
 #[cfg(feature = "modbus")]
-use rusty_s4i_io::protocol::{modbus::{ModbusConfig, ModbusHandler, ModbusProtocol}, ProtocolHandler};
+use rusty_s4i_io::protocol::{
+    modbus::{ModbusConfig, ModbusHandler, ModbusProtocol},
+    ProtocolHandler,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

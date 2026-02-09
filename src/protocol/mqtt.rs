@@ -4,8 +4,8 @@ use crate::error::{Error, Result};
 use crate::protocol::{ProtocolHandler, ProtocolMessage};
 use async_trait::async_trait;
 use std::collections::VecDeque;
-use tokio::sync::Mutex;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 /// MQTT client configuration
 #[derive(Debug, Clone)]
@@ -82,7 +82,9 @@ impl ProtocolHandler for MqttHandler {
         #[cfg(feature = "mqtt")]
         {
             if !*self.connected.lock().await {
-                return Err(Error::Connection("Not connected to MQTT broker".to_string()));
+                return Err(Error::Connection(
+                    "Not connected to MQTT broker".to_string(),
+                ));
             }
             // Publish implementation would go here
             log::debug!("Publishing to topic: {}", message.topic);
@@ -99,7 +101,9 @@ impl ProtocolHandler for MqttHandler {
         #[cfg(feature = "mqtt")]
         {
             if !*self.connected.lock().await {
-                return Err(Error::Connection("Not connected to MQTT broker".to_string()));
+                return Err(Error::Connection(
+                    "Not connected to MQTT broker".to_string(),
+                ));
             }
             // Subscribe implementation would go here
             log::debug!("Subscribing to topic: {}", topic);

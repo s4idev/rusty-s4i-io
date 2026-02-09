@@ -10,22 +10,22 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     /// I/O error
     Io(std::io::Error),
-    
+
     /// Connection error
     Connection(String),
-    
+
     /// Configuration error
     Configuration(String),
-    
+
     /// Protocol error
     Protocol(String),
-    
+
     /// Timeout error
     Timeout,
-    
+
     /// Not supported on this platform
     NotSupported(String),
-    
+
     /// Generic error
     Other(String),
 }

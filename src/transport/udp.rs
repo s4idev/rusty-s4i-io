@@ -1,14 +1,16 @@
 //! UDP transport implementation
 
 use crate::error::{Error, Result};
-use crate::transport::{TransportConfig, TransportEvent, TransportId, TransportService, TransportType};
+use crate::transport::{
+    TransportConfig, TransportEvent, TransportId, TransportService, TransportType,
+};
 use async_trait::async_trait;
 use bytes::Bytes;
 use std::collections::VecDeque;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
-use std::sync::Arc;
 
 /// UDP transport implementation
 pub struct UdpTransport {
@@ -47,28 +49,33 @@ impl TransportService for UdpTransport {
             let local_addr = socket.local_addr()?;
             *self.socket.lock().await = Some(socket);
             *self.connected.lock().await = true;
-            
-            self.events.lock().await.push_back(TransportEvent::Connected(
-                TransportId::Connection(0)
-            ));
-            
+
+            self.events
+                .lock()
+                .await
+                .push_back(TransportEvent::Connected(TransportId::Connection(0)));
+
             log::info!("UDP socket bound to {}", local_addr);
             Ok(())
         } else {
             // Client mode: bind to any local port and set remote address
             let socket = UdpSocket::bind("0.0.0.0:0").await?;
-            let remote: SocketAddr = self.config.address.parse()
+            let remote: SocketAddr = self
+                .config
+                .address
+                .parse()
                 .map_err(|e| Error::Configuration(format!("Invalid address: {}", e)))?;
-            
+
             socket.connect(&remote).await?;
             *self.remote_addr.lock().await = Some(remote);
             *self.socket.lock().await = Some(socket);
             *self.connected.lock().await = true;
-            
-            self.events.lock().await.push_back(TransportEvent::Connected(
-                TransportId::Connection(0)
-            ));
-            
+
+            self.events
+                .lock()
+                .await
+                .push_back(TransportEvent::Connected(TransportId::Connection(0)));
+
             log::info!("UDP socket connected to {}", remote);
             Ok(())
         }
@@ -78,11 +85,12 @@ impl TransportService for UdpTransport {
         *self.socket.lock().await = None;
         *self.connected.lock().await = false;
         *self.remote_addr.lock().await = None;
-        
-        self.events.lock().await.push_back(TransportEvent::Disconnected(
-            TransportId::Connection(0)
-        ));
-        
+
+        self.events
+            .lock()
+            .await
+            .push_back(TransportEvent::Disconnected(TransportId::Connection(0)));
+
         Ok(())
     }
 
@@ -117,12 +125,14 @@ impl TransportService for UdpTransport {
         let socket_guard = self.socket.lock().await;
         if let Some(socket) = socket_guard.as_ref() {
             let mut buffer = vec![0u8; 65536]; // Max UDP packet size
-            
+
             // Non-blocking read
             match tokio::time::timeout(
                 std::time::Duration::from_millis(10),
-                socket.recv_from(&mut buffer)
-            ).await {
+                socket.recv_from(&mut buffer),
+            )
+            .await
+            {
                 Ok(Ok((n, _addr))) => {
                     let data = Bytes::copy_from_slice(&buffer[..n]);
                     Ok(Some(TransportEvent::DataReceived(
@@ -130,12 +140,10 @@ impl TransportService for UdpTransport {
                         data,
                     )))
                 }
-                Ok(Err(e)) => {
-                    Ok(Some(TransportEvent::Error(
-                        TransportId::Connection(0),
-                        e.to_string(),
-                    )))
-                }
+                Ok(Err(e)) => Ok(Some(TransportEvent::Error(
+                    TransportId::Connection(0),
+                    e.to_string(),
+                ))),
                 Err(_) => {
                     // Timeout - no data available
                     Ok(None)
@@ -213,7 +221,10 @@ mod tests {
 
         // Send data from client
         let test_data = Bytes::from("Hello UDP");
-        client.send(&TransportId::Connection(0), test_data.clone()).await.unwrap();
+        client
+            .send(&TransportId::Connection(0), test_data.clone())
+            .await
+            .unwrap();
 
         // Receive on server - first consume the Connected event
         let event = server.poll_event().await.unwrap();
@@ -222,7 +233,7 @@ mod tests {
         // Now receive the data
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         let event = server.poll_event().await.unwrap();
-        
+
         match event {
             Some(TransportEvent::DataReceived(_, data)) => {
                 assert_eq!(data, test_data);

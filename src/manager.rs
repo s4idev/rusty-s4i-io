@@ -24,7 +24,7 @@ impl TransportManager {
     /// Add a transport to the manager
     pub async fn add_transport(&mut self, config: TransportConfig) -> Result<String> {
         let transport_id = format!("{}_{}", config.transport_type, config.address);
-        
+
         let transport: Box<dyn TransportService> = match config.transport_type {
             #[cfg(feature = "tcp")]
             crate::transport::TransportType::Tcp => {
@@ -39,9 +39,9 @@ impl TransportManager {
                 Box::new(crate::transport::http::HttpTransport::new(config)?)
             }
             #[cfg(feature = "websocket")]
-            crate::transport::TransportType::WebSocket => {
-                Box::new(crate::transport::websocket::WebSocketTransport::new(config)?)
-            }
+            crate::transport::TransportType::WebSocket => Box::new(
+                crate::transport::websocket::WebSocketTransport::new(config)?,
+            ),
             #[cfg(feature = "serial")]
             crate::transport::TransportType::Serial => {
                 Box::new(crate::transport::serial::SerialTransport::new(config)?)
@@ -58,11 +58,54 @@ impl TransportManager {
             crate::transport::TransportType::Tls => {
                 Box::new(crate::transport::tls::TlsTransport::new(config)?)
             }
-            _ => {
-                return Err(Error::NotSupported(format!(
-                    "Transport type {:?} is not enabled. Enable the corresponding feature flag.",
-                    config.transport_type
-                )))
+            #[cfg(not(feature = "tcp"))]
+            crate::transport::TransportType::Tcp => {
+                return Err(Error::NotSupported(
+                    "TCP transport not enabled. Enable the 'tcp' feature flag.".to_string(),
+                ))
+            }
+            #[cfg(not(feature = "udp"))]
+            crate::transport::TransportType::Udp => {
+                return Err(Error::NotSupported(
+                    "UDP transport not enabled. Enable the 'udp' feature flag.".to_string(),
+                ))
+            }
+            #[cfg(not(feature = "http"))]
+            crate::transport::TransportType::Http | crate::transport::TransportType::Https => {
+                return Err(Error::NotSupported(
+                    "HTTP transport not enabled. Enable the 'http' feature flag.".to_string(),
+                ))
+            }
+            #[cfg(not(feature = "websocket"))]
+            crate::transport::TransportType::WebSocket => {
+                return Err(Error::NotSupported(
+                    "WebSocket transport not enabled. Enable the 'websocket' feature flag."
+                        .to_string(),
+                ))
+            }
+            #[cfg(not(feature = "serial"))]
+            crate::transport::TransportType::Serial => {
+                return Err(Error::NotSupported(
+                    "Serial transport not enabled. Enable the 'serial' feature flag.".to_string(),
+                ))
+            }
+            #[cfg(not(feature = "usb"))]
+            crate::transport::TransportType::UsbHid => {
+                return Err(Error::NotSupported(
+                    "USB HID transport not enabled. Enable the 'usb' feature flag.".to_string(),
+                ))
+            }
+            #[cfg(not(feature = "ble"))]
+            crate::transport::TransportType::Ble => {
+                return Err(Error::NotSupported(
+                    "BLE transport not enabled. Enable the 'ble' feature flag.".to_string(),
+                ))
+            }
+            #[cfg(not(feature = "tls"))]
+            crate::transport::TransportType::Tls => {
+                return Err(Error::NotSupported(
+                    "TLS transport not enabled. Enable the 'tls' feature flag.".to_string(),
+                ))
             }
         };
 
@@ -98,7 +141,12 @@ impl TransportManager {
     }
 
     /// Send data through a specific transport
-    pub async fn send(&self, transport_id: &str, id: &TransportId, data: bytes::Bytes) -> Result<()> {
+    pub async fn send(
+        &self,
+        transport_id: &str,
+        id: &TransportId,
+        data: bytes::Bytes,
+    ) -> Result<()> {
         let mut transports = self.transports.lock().await;
         if let Some(transport) = transports.get_mut(transport_id) {
             transport.send(id, data).await

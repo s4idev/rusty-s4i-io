@@ -1,7 +1,10 @@
 //! MQTT protocol example
 
 #[cfg(feature = "mqtt")]
-use rusty_s4i_io::protocol::{mqtt::{MqttConfig, MqttHandler}, ProtocolHandler};
+use rusty_s4i_io::protocol::{
+    mqtt::{MqttConfig, MqttHandler},
+    ProtocolHandler,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

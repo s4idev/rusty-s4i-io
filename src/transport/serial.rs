@@ -1,15 +1,18 @@
 //! Serial port transport implementation
 
 use crate::error::{Error, Result};
-use crate::transport::{TransportConfig, TransportEvent, TransportId, TransportService, TransportType};
+use crate::transport::{
+    TransportConfig, TransportEvent, TransportId, TransportService, TransportType,
+};
 use async_trait::async_trait;
 use bytes::Bytes;
 use std::collections::VecDeque;
-use tokio::sync::Mutex;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 /// Serial port transport implementation
 pub struct SerialTransport {
+    #[allow(dead_code)]
     config: TransportConfig,
     events: Arc<Mutex<VecDeque<TransportEvent>>>,
     connected: Arc<Mutex<bool>>,
@@ -39,22 +42,26 @@ impl TransportService for SerialTransport {
         {
             // Serial port connection implementation would go here
             *self.connected.lock().await = true;
-            self.events.lock().await.push_back(TransportEvent::Connected(
-                TransportId::Connection(0)
-            ));
+            self.events
+                .lock()
+                .await
+                .push_back(TransportEvent::Connected(TransportId::Connection(0)));
             Ok(())
         }
         #[cfg(not(feature = "serial"))]
         {
-            Err(Error::NotSupported("Serial feature not enabled".to_string()))
+            Err(Error::NotSupported(
+                "Serial feature not enabled".to_string(),
+            ))
         }
     }
 
     async fn disconnect(&mut self) -> Result<()> {
         *self.connected.lock().await = false;
-        self.events.lock().await.push_back(TransportEvent::Disconnected(
-            TransportId::Connection(0)
-        ));
+        self.events
+            .lock()
+            .await
+            .push_back(TransportEvent::Disconnected(TransportId::Connection(0)));
         Ok(())
     }
 
@@ -70,7 +77,9 @@ impl TransportService for SerialTransport {
         }
         #[cfg(not(feature = "serial"))]
         {
-            Err(Error::NotSupported("Serial feature not enabled".to_string()))
+            Err(Error::NotSupported(
+                "Serial feature not enabled".to_string(),
+            ))
         }
     }
 

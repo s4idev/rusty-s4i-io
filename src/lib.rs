@@ -27,13 +27,13 @@
 //! ```
 
 pub mod error;
-pub mod transport;
-pub mod protocol;
 mod manager;
+pub mod protocol;
+pub mod transport;
 
 pub use error::{Error, Result};
-pub use transport::{TransportService, TransportEvent, TransportId, TransportConfig};
 pub use manager::TransportManager;
+pub use transport::{TransportConfig, TransportEvent, TransportId, TransportService};
 
 #[cfg(test)]
 mod tests {

@@ -1,12 +1,14 @@
 //! HTTP/HTTPS transport implementation
 
 use crate::error::{Error, Result};
-use crate::transport::{TransportConfig, TransportEvent, TransportId, TransportService, TransportType};
+use crate::transport::{
+    TransportConfig, TransportEvent, TransportId, TransportService, TransportType,
+};
 use async_trait::async_trait;
 use bytes::Bytes;
 use std::collections::VecDeque;
-use tokio::sync::Mutex;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 /// HTTP transport implementation
 pub struct HttpTransport {
@@ -20,7 +22,10 @@ pub struct HttpTransport {
 impl HttpTransport {
     /// Create a new HTTP transport
     pub fn new(config: TransportConfig) -> Result<Self> {
-        if !matches!(config.transport_type, TransportType::Http | TransportType::Https) {
+        if !matches!(
+            config.transport_type,
+            TransportType::Http | TransportType::Https
+        ) {
             return Err(Error::Configuration(
                 "Invalid transport type for HTTP".to_string(),
             ));
@@ -43,9 +48,10 @@ impl TransportService for HttpTransport {
         {
             self.client = Some(reqwest::Client::new());
             *self.connected.lock().await = true;
-            self.events.lock().await.push_back(TransportEvent::Connected(
-                TransportId::Connection(0)
-            ));
+            self.events
+                .lock()
+                .await
+                .push_back(TransportEvent::Connected(TransportId::Connection(0)));
             Ok(())
         }
         #[cfg(not(feature = "http"))]
@@ -60,9 +66,10 @@ impl TransportService for HttpTransport {
             self.client = None;
         }
         *self.connected.lock().await = false;
-        self.events.lock().await.push_back(TransportEvent::Disconnected(
-            TransportId::Connection(0)
-        ));
+        self.events
+            .lock()
+            .await
+            .push_back(TransportEvent::Disconnected(TransportId::Connection(0)));
         Ok(())
     }
 
@@ -75,13 +82,14 @@ impl TransportService for HttpTransport {
                 } else {
                     format!("http://{}", self.config.address)
                 };
-                
-                client.post(&url)
+
+                client
+                    .post(&url)
                     .body(data.to_vec())
                     .send()
                     .await
                     .map_err(|e| Error::Connection(e.to_string()))?;
-                
+
                 Ok(())
             } else {
                 Err(Error::Connection("Not connected".to_string()))

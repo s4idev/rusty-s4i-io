@@ -1,14 +1,16 @@
 //! TCP transport implementation
 
 use crate::error::{Error, Result};
-use crate::transport::{TransportConfig, TransportEvent, TransportId, TransportService, TransportType};
+use crate::transport::{
+    TransportConfig, TransportEvent, TransportId, TransportService, TransportType,
+};
 use async_trait::async_trait;
 use bytes::Bytes;
 use std::collections::VecDeque;
+use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
-use std::sync::Arc;
 
 /// TCP transport implementation
 pub struct TcpTransport {
@@ -56,11 +58,12 @@ impl TransportService for TcpTransport {
             let local_addr = listener.local_addr()?;
             *self.listener.lock().await = Some(listener);
             *self.connected.lock().await = true;
-            
-            self.events.lock().await.push_back(TransportEvent::Connected(
-                TransportId::Connection(0)
-            ));
-            
+
+            self.events
+                .lock()
+                .await
+                .push_back(TransportEvent::Connected(TransportId::Connection(0)));
+
             log::info!("TCP server listening on {}", local_addr);
             Ok(())
         } else {
@@ -69,12 +72,13 @@ impl TransportService for TcpTransport {
             let peer_addr = stream.peer_addr()?;
             *self.stream.lock().await = Some(stream);
             *self.connected.lock().await = true;
-            
+
             let id = self.next_id().await;
-            self.events.lock().await.push_back(TransportEvent::Connected(
-                TransportId::Connection(id)
-            ));
-            
+            self.events
+                .lock()
+                .await
+                .push_back(TransportEvent::Connected(TransportId::Connection(id)));
+
             log::info!("TCP client connected to {}", peer_addr);
             Ok(())
         }
@@ -84,11 +88,12 @@ impl TransportService for TcpTransport {
         *self.stream.lock().await = None;
         *self.listener.lock().await = None;
         *self.connected.lock().await = false;
-        
-        self.events.lock().await.push_back(TransportEvent::Disconnected(
-            TransportId::Connection(0)
-        ));
-        
+
+        self.events
+            .lock()
+            .await
+            .push_back(TransportEvent::Disconnected(TransportId::Connection(0)));
+
         Ok(())
     }
 
@@ -115,17 +120,21 @@ impl TransportService for TcpTransport {
         let mut stream_guard = self.stream.lock().await;
         if let Some(stream) = stream_guard.as_mut() {
             let mut buffer = vec![0u8; 4096];
-            
+
             // Non-blocking read
             match tokio::time::timeout(
                 std::time::Duration::from_millis(10),
-                stream.read(&mut buffer)
-            ).await {
+                stream.read(&mut buffer),
+            )
+            .await
+            {
                 Ok(Ok(0)) => {
                     // Connection closed
                     drop(stream_guard);
                     let _ = self.disconnect().await;
-                    Ok(Some(TransportEvent::Disconnected(TransportId::Connection(0))))
+                    Ok(Some(TransportEvent::Disconnected(TransportId::Connection(
+                        0,
+                    ))))
                 }
                 Ok(Ok(n)) => {
                     let data = Bytes::copy_from_slice(&buffer[..n]);
@@ -134,12 +143,10 @@ impl TransportService for TcpTransport {
                         data,
                     )))
                 }
-                Ok(Err(e)) => {
-                    Ok(Some(TransportEvent::Error(
-                        TransportId::Connection(0),
-                        e.to_string(),
-                    )))
-                }
+                Ok(Err(e)) => Ok(Some(TransportEvent::Error(
+                    TransportId::Connection(0),
+                    e.to_string(),
+                ))),
                 Err(_) => {
                     // Timeout - no data available
                     Ok(None)
@@ -203,7 +210,7 @@ mod tests {
         // Connect client
         let client_config = TransportConfig::tcp(&server_addr.to_string()).unwrap();
         let mut client = TcpTransport::new(client_config).unwrap();
-        
+
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         let result = client.connect().await;
         assert!(result.is_ok());

@@ -3,10 +3,9 @@
 use crate::error::{Error, Result};
 use crate::protocol::{ProtocolHandler, ProtocolMessage};
 use async_trait::async_trait;
-use bytes::Bytes;
 use std::collections::VecDeque;
-use tokio::sync::Mutex;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 /// Modbus protocol type
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -68,16 +67,24 @@ impl ModbusHandler {
         #[cfg(feature = "modbus")]
         {
             if !*self.connected.lock().await {
-                return Err(Error::Connection("Not connected to Modbus server".to_string()));
+                return Err(Error::Connection(
+                    "Not connected to Modbus server".to_string(),
+                ));
             }
             // Read implementation would go here
-            log::debug!("Reading {} holding registers from address {}", count, address);
+            log::debug!(
+                "Reading {} holding registers from address {}",
+                count,
+                address
+            );
             Ok(vec![0; count as usize])
         }
         #[cfg(not(feature = "modbus"))]
         {
             let _ = (address, count);
-            Err(Error::NotSupported("Modbus feature not enabled".to_string()))
+            Err(Error::NotSupported(
+                "Modbus feature not enabled".to_string(),
+            ))
         }
     }
 
@@ -86,7 +93,9 @@ impl ModbusHandler {
         #[cfg(feature = "modbus")]
         {
             if !*self.connected.lock().await {
-                return Err(Error::Connection("Not connected to Modbus server".to_string()));
+                return Err(Error::Connection(
+                    "Not connected to Modbus server".to_string(),
+                ));
             }
             // Write implementation would go here
             log::debug!("Writing value {} to register {}", value, address);
@@ -95,7 +104,9 @@ impl ModbusHandler {
         #[cfg(not(feature = "modbus"))]
         {
             let _ = (address, value);
-            Err(Error::NotSupported("Modbus feature not enabled".to_string()))
+            Err(Error::NotSupported(
+                "Modbus feature not enabled".to_string(),
+            ))
         }
     }
 }
@@ -112,7 +123,9 @@ impl ProtocolHandler for ModbusHandler {
         }
         #[cfg(not(feature = "modbus"))]
         {
-            Err(Error::NotSupported("Modbus feature not enabled".to_string()))
+            Err(Error::NotSupported(
+                "Modbus feature not enabled".to_string(),
+            ))
         }
     }
 
@@ -125,7 +138,9 @@ impl ProtocolHandler for ModbusHandler {
         }
         #[cfg(not(feature = "modbus"))]
         {
-            Err(Error::NotSupported("Modbus feature not enabled".to_string()))
+            Err(Error::NotSupported(
+                "Modbus feature not enabled".to_string(),
+            ))
         }
     }
 
@@ -133,7 +148,9 @@ impl ProtocolHandler for ModbusHandler {
         #[cfg(feature = "modbus")]
         {
             if !*self.connected.lock().await {
-                return Err(Error::Connection("Not connected to Modbus server".to_string()));
+                return Err(Error::Connection(
+                    "Not connected to Modbus server".to_string(),
+                ));
             }
             // Modbus write implementation would go here
             let _ = message;
@@ -142,14 +159,18 @@ impl ProtocolHandler for ModbusHandler {
         #[cfg(not(feature = "modbus"))]
         {
             let _ = message;
-            Err(Error::NotSupported("Modbus feature not enabled".to_string()))
+            Err(Error::NotSupported(
+                "Modbus feature not enabled".to_string(),
+            ))
         }
     }
 
     async fn subscribe(&mut self, topic: &str) -> Result<()> {
         // Modbus doesn't have a subscribe concept
         let _ = topic;
-        Err(Error::NotSupported("Subscribe not supported for Modbus".to_string()))
+        Err(Error::NotSupported(
+            "Subscribe not supported for Modbus".to_string(),
+        ))
     }
 
     async fn poll_message(&mut self) -> Result<Option<ProtocolMessage>> {

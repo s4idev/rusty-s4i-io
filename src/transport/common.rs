@@ -127,16 +127,15 @@ impl TransportConfig {
             "udp" => TransportType::Udp,
             "http" => TransportType::Http,
             "https" => TransportType::Https,
-            "ws" => TransportType::WebSocket,
-            "wss" => TransportType::WebSocket,
+            "ws" | "wss" => TransportType::WebSocket,
             "serial" => TransportType::Serial,
             "usb" => TransportType::UsbHid,
             "ble" => TransportType::Ble,
             "tls" => TransportType::Tls,
-            _ => {
+            other => {
                 return Err(crate::error::Error::Configuration(format!(
                     "Unknown transport type: {}",
-                    parts[0]
+                    other
                 )))
             }
         };
@@ -196,7 +195,7 @@ mod tests {
         let id1 = TransportId::Connection(1);
         let id2 = TransportId::Connection(1);
         let id3 = TransportId::Connection(2);
-        
+
         assert_eq!(id1, id2);
         assert_ne!(id1, id3);
     }

@@ -1,11 +1,11 @@
 //! Application layer protocol module
 
-#[cfg(feature = "mqtt")]
-pub mod mqtt;
-#[cfg(feature = "modbus")]
-pub mod modbus;
 #[cfg(feature = "bacnet")]
 pub mod bacnet;
+#[cfg(feature = "modbus")]
+pub mod modbus;
+#[cfg(feature = "mqtt")]
+pub mod mqtt;
 
 pub mod common;
 

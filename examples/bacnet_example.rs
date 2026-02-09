@@ -3,7 +3,7 @@
 #[cfg(feature = "bacnet")]
 use rusty_s4i_io::protocol::{
     bacnet::{BacnetConfig, BacnetHandler, BacnetObjectType, BacnetProperty},
-    ProtocolHandler
+    ProtocolHandler,
 };
 
 #[tokio::main]
@@ -35,12 +35,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // Read a property
-        match handler.read_property(
-            1234,
-            BacnetObjectType::AnalogInput,
-            0,
-            BacnetProperty::PresentValue
-        ).await {
+        match handler
+            .read_property(
+                1234,
+                BacnetObjectType::AnalogInput,
+                0,
+                BacnetProperty::PresentValue,
+            )
+            .await
+        {
             Ok(value) => println!("Read property value: {} bytes", value.len()),
             Err(e) => println!("Error reading property: {}", e),
         }

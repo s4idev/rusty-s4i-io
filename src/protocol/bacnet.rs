@@ -5,8 +5,8 @@ use crate::protocol::{ProtocolHandler, ProtocolMessage};
 use async_trait::async_trait;
 use bytes::Bytes;
 use std::collections::VecDeque;
-use tokio::sync::Mutex;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 /// BACNet object types
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -77,7 +77,9 @@ impl BacnetHandler {
         #[cfg(feature = "bacnet")]
         {
             if !*self.connected.lock().await {
-                return Err(Error::Connection("Not connected to BACNet network".to_string()));
+                return Err(Error::Connection(
+                    "Not connected to BACNet network".to_string(),
+                ));
             }
             // Read property implementation would go here
             log::debug!(
@@ -92,7 +94,9 @@ impl BacnetHandler {
         #[cfg(not(feature = "bacnet"))]
         {
             let _ = (device_id, object_type, object_instance, property);
-            Err(Error::NotSupported("BACNet feature not enabled".to_string()))
+            Err(Error::NotSupported(
+                "BACNet feature not enabled".to_string(),
+            ))
         }
     }
 
@@ -108,7 +112,9 @@ impl BacnetHandler {
         #[cfg(feature = "bacnet")]
         {
             if !*self.connected.lock().await {
-                return Err(Error::Connection("Not connected to BACNet network".to_string()));
+                return Err(Error::Connection(
+                    "Not connected to BACNet network".to_string(),
+                ));
             }
             // Write property implementation would go here
             log::debug!(
@@ -124,7 +130,9 @@ impl BacnetHandler {
         #[cfg(not(feature = "bacnet"))]
         {
             let _ = (device_id, object_type, object_instance, property, value);
-            Err(Error::NotSupported("BACNet feature not enabled".to_string()))
+            Err(Error::NotSupported(
+                "BACNet feature not enabled".to_string(),
+            ))
         }
     }
 
@@ -133,7 +141,9 @@ impl BacnetHandler {
         #[cfg(feature = "bacnet")]
         {
             if !*self.connected.lock().await {
-                return Err(Error::Connection("Not connected to BACNet network".to_string()));
+                return Err(Error::Connection(
+                    "Not connected to BACNet network".to_string(),
+                ));
             }
             // Who-Is implementation would go here
             log::debug!("Performing Who-Is discovery");
@@ -141,7 +151,9 @@ impl BacnetHandler {
         }
         #[cfg(not(feature = "bacnet"))]
         {
-            Err(Error::NotSupported("BACNet feature not enabled".to_string()))
+            Err(Error::NotSupported(
+                "BACNet feature not enabled".to_string(),
+            ))
         }
     }
 }
@@ -153,12 +165,18 @@ impl ProtocolHandler for BacnetHandler {
         {
             // BACNet connection implementation would go here
             *self.connected.lock().await = true;
-            log::info!("BACNet connected to {}:{}", self.config.address, self.config.port);
+            log::info!(
+                "BACNet connected to {}:{}",
+                self.config.address,
+                self.config.port
+            );
             Ok(())
         }
         #[cfg(not(feature = "bacnet"))]
         {
-            Err(Error::NotSupported("BACNet feature not enabled".to_string()))
+            Err(Error::NotSupported(
+                "BACNet feature not enabled".to_string(),
+            ))
         }
     }
 
@@ -171,7 +189,9 @@ impl ProtocolHandler for BacnetHandler {
         }
         #[cfg(not(feature = "bacnet"))]
         {
-            Err(Error::NotSupported("BACNet feature not enabled".to_string()))
+            Err(Error::NotSupported(
+                "BACNet feature not enabled".to_string(),
+            ))
         }
     }
 
@@ -179,7 +199,9 @@ impl ProtocolHandler for BacnetHandler {
         #[cfg(feature = "bacnet")]
         {
             if !*self.connected.lock().await {
-                return Err(Error::Connection("Not connected to BACNet network".to_string()));
+                return Err(Error::Connection(
+                    "Not connected to BACNet network".to_string(),
+                ));
             }
             // BACNet write implementation would go here
             let _ = message;
@@ -188,7 +210,9 @@ impl ProtocolHandler for BacnetHandler {
         #[cfg(not(feature = "bacnet"))]
         {
             let _ = message;
-            Err(Error::NotSupported("BACNet feature not enabled".to_string()))
+            Err(Error::NotSupported(
+                "BACNet feature not enabled".to_string(),
+            ))
         }
     }
 
@@ -196,7 +220,9 @@ impl ProtocolHandler for BacnetHandler {
         // BACNet doesn't have a traditional subscribe concept
         // Could be used for COV (Change of Value) subscriptions
         let _ = topic;
-        Err(Error::NotSupported("Subscribe not fully supported for BACNet".to_string()))
+        Err(Error::NotSupported(
+            "Subscribe not fully supported for BACNet".to_string(),
+        ))
     }
 
     async fn poll_message(&mut self) -> Result<Option<ProtocolMessage>> {
