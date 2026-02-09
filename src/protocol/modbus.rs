@@ -3,9 +3,15 @@
 use crate::error::{Error, Result};
 use crate::protocol::{ProtocolHandler, ProtocolMessage};
 use async_trait::async_trait;
+use bytes::Bytes;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+
+#[cfg(feature = "modbus")]
+use tokio_modbus::client::{Context, tcp, rtu};
+#[cfg(feature = "modbus")]
+use tokio_modbus::prelude::*;
 
 /// Modbus protocol type
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -48,6 +54,8 @@ pub enum ModbusFunction {
 /// Modbus protocol handler
 pub struct ModbusHandler {
     config: ModbusConfig,
+    #[cfg(feature = "modbus")]
+    context: Arc<Mutex<Option<Context>>>,
     connected: Arc<Mutex<bool>>,
     messages: Arc<Mutex<VecDeque<ProtocolMessage>>>,
 }
@@ -57,6 +65,8 @@ impl ModbusHandler {
     pub fn new(config: ModbusConfig) -> Self {
         Self {
             config,
+            #[cfg(feature = "modbus")]
+            context: Arc::new(Mutex::new(None)),
             connected: Arc::new(Mutex::new(false)),
             messages: Arc::new(Mutex::new(VecDeque::new())),
         }
@@ -66,25 +76,23 @@ impl ModbusHandler {
     pub async fn read_holding_registers(&mut self, address: u16, count: u16) -> Result<Vec<u16>> {
         #[cfg(feature = "modbus")]
         {
-            if !*self.connected.lock().await {
-                return Err(Error::Connection(
-                    "Not connected to Modbus server".to_string(),
-                ));
+            let mut ctx_guard = self.context.lock().await;
+            if let Some(ctx) = ctx_guard.as_mut() {
+                let result = ctx
+                    .read_holding_registers(address, count)
+                    .await
+                    .map_err(|e| Error::Protocol(format!("Modbus read failed: {}", e)))?;
+                
+                log::debug!("Read {} holding registers from address {}", count, address);
+                Ok(result)
+            } else {
+                Err(Error::Connection("Not connected to Modbus server".to_string()))
             }
-            // Read implementation would go here
-            log::debug!(
-                "Reading {} holding registers from address {}",
-                count,
-                address
-            );
-            Ok(vec![0; count as usize])
         }
         #[cfg(not(feature = "modbus"))]
         {
             let _ = (address, count);
-            Err(Error::NotSupported(
-                "Modbus feature not enabled".to_string(),
-            ))
+            Err(Error::NotSupported("Modbus feature not enabled".to_string()))
         }
     }
 
@@ -92,21 +100,95 @@ impl ModbusHandler {
     pub async fn write_single_register(&mut self, address: u16, value: u16) -> Result<()> {
         #[cfg(feature = "modbus")]
         {
-            if !*self.connected.lock().await {
-                return Err(Error::Connection(
-                    "Not connected to Modbus server".to_string(),
-                ));
+            let mut ctx_guard = self.context.lock().await;
+            if let Some(ctx) = ctx_guard.as_mut() {
+                ctx
+                    .write_single_register(address, value)
+                    .await
+                    .map_err(|e| Error::Protocol(format!("Modbus write failed: {}", e)))?;
+                
+                log::debug!("Wrote value {} to register {}", value, address);
+                Ok(())
+            } else {
+                Err(Error::Connection("Not connected to Modbus server".to_string()))
             }
-            // Write implementation would go here
-            log::debug!("Writing value {} to register {}", value, address);
-            Ok(())
         }
         #[cfg(not(feature = "modbus"))]
         {
             let _ = (address, value);
-            Err(Error::NotSupported(
-                "Modbus feature not enabled".to_string(),
-            ))
+            Err(Error::NotSupported("Modbus feature not enabled".to_string()))
+        }
+    }
+
+    /// Read input registers
+    pub async fn read_input_registers(&mut self, address: u16, count: u16) -> Result<Vec<u16>> {
+        #[cfg(feature = "modbus")]
+        {
+            let mut ctx_guard = self.context.lock().await;
+            if let Some(ctx) = ctx_guard.as_mut() {
+                let result = ctx
+                    .read_input_registers(address, count)
+                    .await
+                    .map_err(|e| Error::Protocol(format!("Modbus read failed: {}", e)))?;
+                
+                log::debug!("Read {} input registers from address {}", count, address);
+                Ok(result)
+            } else {
+                Err(Error::Connection("Not connected to Modbus server".to_string()))
+            }
+        }
+        #[cfg(not(feature = "modbus"))]
+        {
+            let _ = (address, count);
+            Err(Error::NotSupported("Modbus feature not enabled".to_string()))
+        }
+    }
+
+    /// Read coils
+    pub async fn read_coils(&mut self, address: u16, count: u16) -> Result<Vec<bool>> {
+        #[cfg(feature = "modbus")]
+        {
+            let mut ctx_guard = self.context.lock().await;
+            if let Some(ctx) = ctx_guard.as_mut() {
+                let result = ctx
+                    .read_coils(address, count)
+                    .await
+                    .map_err(|e| Error::Protocol(format!("Modbus read failed: {}", e)))?;
+                
+                log::debug!("Read {} coils from address {}", count, address);
+                Ok(result)
+            } else {
+                Err(Error::Connection("Not connected to Modbus server".to_string()))
+            }
+        }
+        #[cfg(not(feature = "modbus"))]
+        {
+            let _ = (address, count);
+            Err(Error::NotSupported("Modbus feature not enabled".to_string()))
+        }
+    }
+
+    /// Write single coil
+    pub async fn write_single_coil(&mut self, address: u16, value: bool) -> Result<()> {
+        #[cfg(feature = "modbus")]
+        {
+            let mut ctx_guard = self.context.lock().await;
+            if let Some(ctx) = ctx_guard.as_mut() {
+                ctx
+                    .write_single_coil(address, value)
+                    .await
+                    .map_err(|e| Error::Protocol(format!("Modbus write failed: {}", e)))?;
+                
+                log::debug!("Wrote value {} to coil {}", value, address);
+                Ok(())
+            } else {
+                Err(Error::Connection("Not connected to Modbus server".to_string()))
+            }
+        }
+        #[cfg(not(feature = "modbus"))]
+        {
+            let _ = (address, value);
+            Err(Error::NotSupported("Modbus feature not enabled".to_string()))
         }
     }
 }
@@ -116,61 +198,75 @@ impl ProtocolHandler for ModbusHandler {
     async fn connect(&mut self) -> Result<()> {
         #[cfg(feature = "modbus")]
         {
-            // Modbus connection implementation using tokio-modbus would go here
+            let context = match self.config.protocol {
+                ModbusProtocol::Tcp => {
+                    let socket_addr = self.config.address.parse()
+                        .map_err(|e| Error::Configuration(format!("Invalid address: {}", e)))?;
+                    
+                    let ctx = tcp::connect_slave(socket_addr, Slave(self.config.slave_id))
+                        .await
+                        .map_err(|e| Error::Connection(format!("Modbus TCP connection failed: {}", e)))?;
+                    
+                    ctx
+                }
+                ModbusProtocol::Rtu => {
+                    #[cfg(feature = "serial")]
+                    {
+                        use tokio_serial::SerialPortBuilderExt;
+                        
+                        let builder = tokio_serial::new(&self.config.address, 9600);
+                        let port = builder.open_native_async()
+                            .map_err(|e| Error::Connection(format!("Failed to open serial port: {}", e)))?;
+                        
+                        let ctx = rtu::connect_slave(port, Slave(self.config.slave_id))
+                            .await
+                            .map_err(|e| Error::Connection(format!("Modbus RTU connection failed: {}", e)))?;
+                        
+                        ctx
+                    }
+                    #[cfg(not(feature = "serial"))]
+                    {
+                        return Err(Error::NotSupported(
+                            "Modbus RTU requires serial feature".to_string()
+                        ));
+                    }
+                }
+            };
+
+            *self.context.lock().await = Some(context);
             *self.connected.lock().await = true;
+            
             log::info!("Modbus connected to {}", self.config.address);
             Ok(())
         }
         #[cfg(not(feature = "modbus"))]
         {
-            Err(Error::NotSupported(
-                "Modbus feature not enabled".to_string(),
-            ))
+            Err(Error::NotSupported("Modbus feature not enabled".to_string()))
         }
     }
 
     async fn disconnect(&mut self) -> Result<()> {
         #[cfg(feature = "modbus")]
         {
-            *self.connected.lock().await = false;
-            log::info!("Modbus disconnected");
-            Ok(())
+            *self.context.lock().await = None;
         }
-        #[cfg(not(feature = "modbus"))]
-        {
-            Err(Error::NotSupported(
-                "Modbus feature not enabled".to_string(),
-            ))
-        }
+        
+        *self.connected.lock().await = false;
+        log::info!("Modbus disconnected");
+        Ok(())
     }
 
     async fn publish(&mut self, message: ProtocolMessage) -> Result<()> {
-        #[cfg(feature = "modbus")]
-        {
-            if !*self.connected.lock().await {
-                return Err(Error::Connection(
-                    "Not connected to Modbus server".to_string(),
-                ));
-            }
-            // Modbus write implementation would go here
-            let _ = message;
-            Ok(())
-        }
-        #[cfg(not(feature = "modbus"))]
-        {
-            let _ = message;
-            Err(Error::NotSupported(
-                "Modbus feature not enabled".to_string(),
-            ))
-        }
+        // Modbus doesn't have a traditional publish concept
+        // This could be used to write data to registers
+        let _ = message;
+        Err(Error::NotSupported("Publish not supported for Modbus. Use write_single_register() instead.".to_string()))
     }
 
     async fn subscribe(&mut self, topic: &str) -> Result<()> {
         // Modbus doesn't have a subscribe concept
         let _ = topic;
-        Err(Error::NotSupported(
-            "Subscribe not supported for Modbus".to_string(),
-        ))
+        Err(Error::NotSupported("Subscribe not supported for Modbus".to_string()))
     }
 
     async fn poll_message(&mut self) -> Result<Option<ProtocolMessage>> {
